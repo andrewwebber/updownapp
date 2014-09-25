@@ -2,12 +2,12 @@ package updownapp
 
 import (
 	"errors"
+	"github.com/couchbaselabs/go-couchbase"
+	"strings"
 	"time"
 )
 
 type IPresentation interface {
-	Key() string
-	SetKey(string)
 	Title() string
 	SetTitle(string)
 	CreatedAt() time.Time
@@ -83,6 +83,10 @@ func (p *Presentation) SetPersisted(persisted bool) {
 	p.IsPersisted = persisted
 }
 
+type PresentationIndex struct {
+	Keys []string
+}
+
 func (p *Presentation) Save() error {
 	factory := NewCouchbaseConnectionFactory()
 	bucket := factory.GetDefaultConnection()
@@ -90,8 +94,35 @@ func (p *Presentation) Save() error {
 		return errors.New("Bucket should not be nil")
 	}
 
+	indexKey := "Index"
+	var index PresentationIndex
+	err := bucket.Get(indexKey, &index)
+	if err != nil {
+		if strings.Contains(err.Error(), "Not found") {
+			index = PresentationIndex{[]string{}}
+		} else {
+			return err
+		}
+	}
+
 	if err := bucket.Set(p.ID, 0, p); err != nil {
 		return err
+	}
+
+	keyExists := false
+	for _, key := range index.Keys {
+		if key == p.ID {
+			keyExists = true
+			break
+		}
+	}
+
+	if !keyExists {
+		index.Keys = append(index.Keys, p.ID)
+
+		if err := bucket.Set(indexKey, 0, index); err != nil {
+			return err
+		}
 	}
 
 	p.IsPersisted = true
@@ -100,10 +131,9 @@ func (p *Presentation) Save() error {
 }
 
 func FindPresentation(key string) (IPresentation, error) {
-	factory := NewCouchbaseConnectionFactory()
-	bucket := factory.GetDefaultConnection()
-	if bucket == nil {
-		return nil, errors.New("Bucket should not be nil")
+	bucket, err := getBucket()
+	if err != nil {
+		return nil, err
 	}
 
 	var presentation Presentation
@@ -115,5 +145,41 @@ func FindPresentation(key string) (IPresentation, error) {
 }
 
 func FindAllPresentations() ([]IPresentation, error) {
-	return nil, nil
+	indexKey := "Index"
+	var index PresentationIndex
+	bucket, err := getBucket()
+	if err != nil {
+		return nil, err
+	}
+
+	err = bucket.Get(indexKey, &index)
+	if err != nil {
+		if strings.Contains(err.Error(), "Not found") {
+			index = PresentationIndex{[]string{}}
+		} else {
+			return nil, err
+		}
+	}
+
+	var result []IPresentation
+	for _, key := range index.Keys {
+		presentation, err := FindPresentation(key)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, presentation)
+	}
+
+	return result, nil
+}
+
+func getBucket() (*couchbase.Bucket, error) {
+	factory := NewCouchbaseConnectionFactory()
+	bucket := factory.GetDefaultConnection()
+	if bucket == nil {
+		return nil, errors.New("Bucket should not be nil")
+	}
+
+	return bucket, nil
 }

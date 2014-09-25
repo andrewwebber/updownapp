@@ -19,9 +19,9 @@ func TestSave(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
-	key := "TestFind"
-	Save(t, key)
-	presentation, err := updownapp.FindPresentation(key)
+	title := "TestFind"
+	Save(t, title)
+	presentation, err := updownapp.FindPresentation(title)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,8 +34,8 @@ func TestFind(t *testing.T) {
 }
 
 func TestFindAll(t *testing.T) {
-	key := "TestFindAll"
-	Save(t, key)
+	title := "TestFindAll"
+	Save(t, title)
 	presentations, err := updownapp.FindAllPresentations()
 	if err != nil {
 		t.Fatal(err)
@@ -63,5 +63,7 @@ func Save(t FatalLogger, title string) {
 
 	presentation := updownapp.NewPresentation()
 	presentation.SetTitle(title)
-	presentation.Save()
+	if err := presentation.Save(); err != nil {
+		t.Fatal(err)
+	}
 }
