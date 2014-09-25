@@ -50,10 +50,6 @@ func TestFindAll(t *testing.T) {
 	}
 }
 
-type FatalLogger interface {
-	Fatal(...interface{})
-}
-
 func Save(t FatalLogger, title string) {
 	factory := updownapp.NewCouchbaseConnectionFactory()
 	bucket := factory.GetDefaultConnection()
