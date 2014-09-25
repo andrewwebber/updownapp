@@ -94,38 +94,40 @@ func (p *Presentation) Save() error {
 		return errors.New("Bucket should not be nil")
 	}
 
-	indexKey := "Index"
-	var index PresentationIndex
-	err := bucket.Get(indexKey, &index)
-	if err != nil {
-		if strings.Contains(err.Error(), "Not found") {
-			index = PresentationIndex{[]string{}}
-		} else {
-			return err
+	if !p.IsPersisted {
+		indexKey := "Index"
+		var index PresentationIndex
+		err := bucket.Get(indexKey, &index)
+		if err != nil {
+			if strings.Contains(err.Error(), "Not found") {
+				index = PresentationIndex{[]string{}}
+			} else {
+				return err
+			}
 		}
+
+		keyExists := false
+		for _, key := range index.Keys {
+			if key == p.ID {
+				keyExists = true
+				break
+			}
+		}
+
+		if !keyExists {
+			index.Keys = append(index.Keys, p.ID)
+
+			if err := bucket.Set(indexKey, 0, index); err != nil {
+				return err
+			}
+		}
+
+		p.IsPersisted = true
 	}
 
 	if err := bucket.Set(p.ID, 0, p); err != nil {
 		return err
 	}
-
-	keyExists := false
-	for _, key := range index.Keys {
-		if key == p.ID {
-			keyExists = true
-			break
-		}
-	}
-
-	if !keyExists {
-		index.Keys = append(index.Keys, p.ID)
-
-		if err := bucket.Set(indexKey, 0, index); err != nil {
-			return err
-		}
-	}
-
-	p.IsPersisted = true
 
 	return nil
 }
